@@ -103,7 +103,7 @@ function updateUserTurn(selectedUser) {
   User.update({ isTurn: false }, { where: {} }).then(() => {
     selectedUser.update({ isTurn: true }).then(() => {
       clearTimeout(switchTimer);
-      switchTimer = setTimeout(selectUserForQuestion, 3600000); // 1 hour
+      switchTimer = setTimeout(selectUserForQuestion, 1800000); // 30 min
     });
   });
 }
