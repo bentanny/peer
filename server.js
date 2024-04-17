@@ -1,151 +1,258 @@
-const token = new URLSearchParams(window.location.search).get('token');
+const express = require('express');
+const http = require('http');
+const { Server } = require("socket.io");
+const bodyParser = require('body-parser');
+const { sequelize, User, Poll, Vote, AnswerCount } = require('./database');
+const { Sequelize, Op } = require('sequelize');
 
-if (token) {
-    fetch(`/is-it-my-turn?token=${token}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.isTurn) {
-          document.getElementById('question-form').style.display = 'block';
-        } else {
-          document.getElementById('wait-message').style.display = 'block';
-        }
-      });
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+app.use(express.static('public'));
+app.use(bodyParser.json()); // Use body-parser to parse JSON bodies
+
+//TESTING FUNCTION
+const allowAnyUser = false; // Set this to false to restrict to specific tokens
+
+// Initialize database and start the server
+sequelize.sync()
+  .then(() => {
+    server.listen(3000, () => {
+      // Initialize narrator selection immediately
+      selectUserForQuestion();
+    })
+  })
+
+  .catch(error => {
+    console.error('Failed to sync database:', error);
+});
+
+//Validating tokens on server
+app.use(async (req, res, next) => {
+  const { token } = req.query;
+  if (!token) {
+    return res.status(403).send("A token is required for authentication.");
   }
 
-//Handling poll submission in frontend
-document.addEventListener('DOMContentLoaded', () => {
-    // Extract token from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+  const user = await User.findOne({ where: { token } });
+  if (!user) {
+    return res.status(401).send("Invalid token.");
+  }
 
-    // Connect to socket with token as query parameter
-    const socket = io({ query: `token=${token}` });
+  req.user = user; // Attach the user to the request object
+  next();
+});
+
+app.get('/is-it-my-turn', (req, res) => {
+  const { token } = req.query;
+  // Logic to check if it's the user's turn
+  res.json({ isTurn: true }); // Example response
+});
 
 
-    // Listen for server's instruction to show/hide the new poll container
-    socket.on('update_turn_status', ({ isTurn }) => {
-        const newPollContainer = document.getElementById('new-poll-container');
-        if (isTurn) {
-          newPollContainer.style.display = 'block';
-        } else {
-          newPollContainer.style.display = 'none';
-        }
-      });
-
-    //Create Poll button
-    const createPollBtn = document.getElementById('create-poll-btn');
-    createPollBtn.addEventListener('click', () => {
-        const question = document.getElementById('poll-question').value;
-        const answers = [
-            document.getElementById('poll-answer-1').value,
-            document.getElementById('poll-answer-2').value,
-            document.getElementById('poll-answer-3').value,
-            document.getElementById('poll-answer-4').value,
-        ].filter(answer => answer.trim() !== ''); // Filter out empty answers
-
-        // Send the poll data to the server if there's at least one answer
-        if (answers.length > 0) {
-            socket.emit('create_poll', { question, answers });
-        } else {
-            alert("Please enter at least one answer option.");
-        }
+//Choosing narrator:
+let switchTimer;
+function selectUserForQuestion() {
+  if (allowAnyUser) {
+    // Select from any user
+    User.findAll().then(users => {
+      if (users.length === 0) return;
+      const randomIndex = Math.floor(Math.random() * users.length);
+      const selectedUser = users[randomIndex];
+      updateUserTurn(selectedUser);
     });
-
-    // Receive and display a new poll from the server
-    socket.on('poll_created', pollData => {
-        if (pollData.id) { // Changed from pollData.pollId to pollData.id
-            socket.emit('check_voted', { pollId: pollData.id }, (hasVoted) => {
-                displayPoll(pollData, hasVoted);
-            });
+  } else {
+    // Select only from specific tokens
+    User.findAll({
+      where: {
+        token: {
+          [Op.in]: ["58616959-59fe-41dc-9932-a3e24d37bd29", "295bb317-f74d-46f7-9ac4-3766ad383975"]
         }
+      }
+    }).then(users => {
+      if (users.length === 0) return;
+      const randomIndex = Math.floor(Math.random() * users.length);
+      const selectedUser = users[randomIndex];
+      updateUserTurn(selectedUser);
     });
+  }
+}
 
-    //Update poll whenever vote is received
-    socket.on('update_poll', pollData => {
-        if (pollData.id) {
-            socket.emit('check_voted', { pollId: pollData.id }, (hasVoted) => {
-                displayPoll(pollData, hasVoted);
-            });
-        }
+function updateUserTurn(selectedUser) {
+  User.update({ isTurn: false }, { where: {} }).then(() => {
+    selectedUser.update({ isTurn: true }).then(() => {
+      clearTimeout(switchTimer);
+      switchTimer = setTimeout(selectUserForQuestion, 3600000); // 1 hour
     });
+  });
+}
 
-    //Submitting vote using submit_vote
-    function submitVote(pollData, answerIndex) {
-        const selectedOption = document.querySelector('input[name="poll"]:checked');
-        if (selectedOption) {
-            const voteData = {
-                pollId: pollData.id,  // Using pollData.id
-                answerIndex: answerIndex
-            };
-            socket.emit('submit_vote', voteData);  // Use voteData directly
-            document.querySelectorAll('button').forEach(button => button.disabled = true);  // Optionally, change to just the vote button later
-            document.getElementById('vote-disclosure').style.display = 'none';    
-        } else {
-            alert('Please select an option to vote.');
-        }
+// Function to check if all users have voted
+function checkAllVoted(pollId) {
+  Vote.findAndCountAll({ where: { pollId: pollId } })
+    .then(result => {
+      if (result.count >= 16) { // Assuming there are exactly 16 users
+        selectUserForQuestion();
+      }
+    })
+    .catch(err => console.error("Error checking votes:", err));
+}
+
+
+//handling poll creation in backend
+// Placeholder for storing polls in memory
+let currentPoll = null; // Store current poll at a higher scope to maintain state across connections
+
+io.on('connection', (socket) => {
+    // Fetch the most recent poll from the database
+    Poll.findOne({
+      order: [['createdAt', 'DESC']]
+    }).then(poll => {
+      if (poll) {
+          const answers = JSON.parse(poll.answers); // Ensure answers are parsed into an array
+          AnswerCount.findAll({
+              where: { pollId: poll.id }
+          }).then(answerCounts => {
+              const votes = answers.map((_, index) => {
+                  const countEntry = answerCounts.find(ac => ac.answerIndex === index);
+                  return countEntry ? countEntry.count : 0;
+              });
+              const totalVotes = votes.reduce((a, b) => a + b, 0);
+  
+              socket.emit('poll_created', {
+                  id: poll.id,
+                  question: poll.question,
+                  answers: answers,
+                  votes: votes,
+                  totalVotes: totalVotes
+              });
+          });
+      }
+  }).catch(err => console.error('Error fetching the latest poll:', err));
+  
+
+    const token = socket.handshake.query.token;
+
+    // Emit turn status based on the token
+    if (token === "58616959-59fe-41dc-9932-a3e24d37bd29") {
+        socket.emit('update_turn_status', { isTurn: true });
+    } else {
+        socket.emit('update_turn_status', { isTurn: false });
     }
+
+    const { v4: uuidv4 } = require('uuid');
     
-    function displayPoll(pollData, hasVoted) {    
-        const pollContainer = document.getElementById('poll-container');
-        pollContainer.innerHTML = `<h3>${pollData.question}</h3>`;
-    
-        const maxVotes = Math.max(...pollData.votes);
-        const winners = pollData.votes.filter(vote => vote === maxVotes); // Count how many have max votes
-    
-        pollData.answers.forEach((answer, index) => {
-            const voteCount = pollData.votes[index] || 0;
-            const totalVotes = pollData.totalVotes || pollData.votes.reduce((a, b) => a + b, 0);
-            const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
-            const isWinningAnswer = voteCount === maxVotes && totalVotes > 0 && hasVoted;
-            const isTie = winners.length > 1 && isWinningAnswer; // Check if there is a tie and it's a winning answer
-    
-            const emoji = isTie ? '🤝' : '🎉'; // Use scales for tie, tada otherwise
-            const percentageText = isWinningAnswer ? `${emoji} ${percentage}%` : `${percentage}%`;
-            const answerClass = isWinningAnswer ? 'winning-answer' : '';
-    
-            const answerHTML = `
-            <label for="answer${index}" class="poll-label ${answerClass}">
-                <div class="answer-and-stats">
-                    ${!hasVoted ? `<input type="radio" id="answer${index}" name="poll" value="${index}">` : ''}
-                    <span class="answer-text">${answer}</span>
-                    ${hasVoted ? `
-                        <div class="stats">
-                            <span class="percentage-text">${percentageText}</span>
-                            <span class="vote-count">${voteCount} votes</span>
-                        </div>
-                    ` : ''}
-                </div>
-                ${hasVoted ? `<div class="progress-bar-container">
-                    <div class="progress-bar" style="width: ${percentage}%;"></div>
-                </div>` : ''}
-            </label>`;
-    
-            pollContainer.innerHTML += `<div class="poll-item">${answerHTML}</div>`;
+    socket.on('create_poll', async (pollData) => {
+      try{  
+        if (token === "58616959-59fe-41dc-9932-a3e24d37bd29") {
+          const pollId = uuidv4();  // Generates a unique UUID
+          const newPoll = await Poll.create({
+            id: pollId,
+            question: pollData.question,
+            answers: JSON.stringify(pollData.answers),  // Storing answers as a JSON string for DB
         });
-    
-        if (!hasVoted) {
-            const voteButton = document.createElement('button');
-            voteButton.textContent = 'Vote';
-            voteButton.onclick = function() {
-                const selectedOption = document.querySelector('input[name="poll"]:checked');
-                if (selectedOption) {
-                    const answerIndex = parseInt(selectedOption.value);
-                    submitVote(pollData, answerIndex); // Passing the pollId and answerIndex
-                } else {
-                    alert('Please select an option to vote.');
-                }
-            };
-            pollContainer.appendChild(voteButton);
-            document.getElementById('vote-disclosure').style.display = 'block'; // Show the disclosure if not voted
-        } else {
-            document.getElementById('vote-disclosure').style.display = 'none'; // Hide the disclosure if voted
+          currentPoll = {
+            id: newPoll.id,
+            question: newPoll.question,
+            answers: pollData.answers,
+            votes: new Array(pollData.answers.length).fill(0)
+          };
+          io.emit('poll_created', currentPoll);
         }
-    }
+      } catch (error) {
+        console.error("Error creating poll:", error);
+      }
+    });
 
-    //Vote buttoo function
-    const voteButton = document.getElementById('vote-button'); 
-    if (voteButton) {
-        voteButton.addEventListener('click', submitVote);
-    }
-    
-})
+    // Checking if User has already voted
+    socket.on('check_voted', async (data, callback) => {
+      try {
+        const { pollId } = data;
+
+        if (!pollId) {
+          console.error('Poll ID is undefined');
+          callback(false);
+          return;
+        }
+        const user = await User.findOne({ where: { token: socket.handshake.query.token } });
+        if (!user) {
+            console.error('User not found');
+            callback(false);  // Assuming false means not voted
+            return;
+        }
+
+        const existingVote = await Vote.findOne({
+            where: { userId: user.id, pollId: pollId }
+        });
+
+        callback(!!existingVote);
+      } catch (error) {
+          console.error('Error checking vote status:', error);
+          callback(false);  // Safe default on error
+      }
+    });
+  
+    //submit vote
+    socket.on('submit_vote', async (voteData) => {
+      try {
+        const { pollId, answerIndex } = voteData;
+        const user = await User.findOne({ where: { token: socket.handshake.query.token } });
+        if (!user) throw new Error("User not found");
+        const poll = await Poll.findByPk(pollId);
+        if (!poll) throw new Error("Poll not found");
+
+        const answerCount = await AnswerCount.findOne({
+          where: { pollId: pollId, answerIndex: answerIndex }
+        });
+
+        const existingVote = await Vote.findOne({
+          where: { userId: user.id, pollId: pollId }
+        });
+
+        if (existingVote) {
+            socket.emit('vote_error', 'You have already voted!');
+        } else {
+          await Vote.create({
+              userId: user.id,
+              pollId: pollId              
+            });
+        
+          if (answerCount) {
+            answerCount.count += 1;
+            await answerCount.save();
+          } else {
+            await AnswerCount.create({
+                pollId: pollId,
+                answerIndex: answerIndex,
+                count: 1
+            });
+          }
+        }   
+        // Retrieve the number of votes for each answer
+        const answers = JSON.parse(poll.answers);
+        const answersVoteCounts = await Promise.all(answers.map(async (_, index) => {
+          const count = await AnswerCount.sum('count', {
+            where: { pollId: pollId, answerIndex: index }
+          });
+          return count || 0;
+        }));
+
+        const totalVotes = answersVoteCounts.reduce((a, b) => a + b, 0);
+        io.emit('update_poll', {
+          id: pollId,
+          question: poll.question,
+          answers: answers,
+          votes: answersVoteCounts,
+          totalVotes
+        });
+          
+      } catch (error) {
+          console.error('Voting error:', error);
+          socket.emit('vote_error', 'Error processing your vote');
+      }
+    });
+  
+
+});
