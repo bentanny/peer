@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+       
+       * {
+        font-family: "Poppins", sans-serif;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        }
+
+        ::selection {
+        background: #265B57;
+        color: #fff;
+        }
+
+        header {
+            text-align: center; /* Centers text horizontally */
+            width: 100%; /* Ensures the header spans the full width */
+        }
+        
+        body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #265B57;
+        }
+
+        .wrapper {
+            max-width: 420px;
+            width: 100%;
+            background: #fff;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1.5px solid #d3d3d3; /* A light gray border */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4); /* A slightly darker shadow for more depth */
+        }
+
+        .wrapper header {
+        font-size: 22px;
+        font-weight: 600;
+        }
+
+        .wrapper .poll-area {
+        margin: 20px 0 15px 0;
+        }
+
+        #new-poll-container {
+            padding: 8px;
+            background-color: #fff;
+            margin-bottom: 20px; /* Space between sections */
+            width: 100%; /* Match the width of the poll answer section */
+            margin-left: auto; /* Centering the container */
+            margin-right: auto; /* Centering the container */
+            display: none; /* Hidden by default, shown when it's time to create a poll */
+        }
+
+        #new-poll-container h2 {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        #new-poll-container > div {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        #new-poll-container input[type="text"] {
+            width: 100%; /* Full width taking into account padding */
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #d3d3d3;
+            border-radius: 5px;
+        }
+        
+        .wrapper .poll-area button, #new-poll-container button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            background-color: #71E0D7; /* Teal color */
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .wrapper .poll-area button:hover, #new-poll-container button:hover {
+            background-color: #5ac9cd; /* A slightly darker shade for hover effect */
+        }
+        
+        #vote-disclosure {
+            color: gray;
+            font-size: small;
+            text-align: center;
+            margin-top: 20px;
+            display: block; /* Initially hidden */
+        }
+
+        .wrapper .poll-area label {
+            display: flex;
+            flex-direction: column;
+            padding: 8px;
+            border: 1px solid #e6e6e6;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            margin-top: 10px;
+            padding-left: 15px;
+            padding-right: 15px;
+            padding-bottom: 15px;
+            background-color: #fff;
+        }
+
+        .wrapper .poll-area .radio-and-answer {
+            display: flex;
+            align-items: center;
+        }
+
+        .wrapper .poll-area .stats {
+            text-align: right; /* Aligns stats text to the right */
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end; /* Ensures stats are right-aligned */
+            font-size: 0.9em; /* Slightly smaller font size for the vote count */
+        }
+
+
+        .wrapper .poll-area .vote-stats {
+            display: flex;
+            justify-content: flex-end; /* Aligns the percentage and vote count to the right */
+            margin-bottom: 8px; /* Space between stats and progress bar */
+        }
+
+        .wrapper .poll-area .vote-count {
+            white-space: nowrap; /* Keeps the vote count in one line */
+            font-weight: normal; /* Regular font weight for the vote count */
+            font-size: 0.8em; /* Smaller font size specifically for the vote count */
+        }
+
+        .wrapper .poll-area .answer-container {
+            display: flex;
+            align-items: center; /* Aligns the radio button and text vertically */
+            margin-bottom: 8px; /* Space between answer and stats */
+        }
+
+        .wrapper .poll-area .answer-and-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-top: 10px;
+            margin-bottom:4px;
+        }
+
+        .wrapper .poll-area .answer-details {
+            display: flex;
+            align-items: center; /* Ensure vertical center alignment of the text and radio button */
+            width: 100%;
+        }
+
+        .wrapper .poll-area label .label-content {
+            display: flex;
+            justify-content: space-between; /* Aligns the answer and percentage on the same line */
+            align-items: center;
+        }
+
+        .wrapper .poll-area label .answer-text {
+            flex-grow: 1; /* Takes up remaining space, pushing the percentage text to the right */
+            margin-right:10px;
+            line-height: 1.2; /* Adjust line height to help with vertical alignment */
+        }
+
+        .wrapper .poll-area label.active {
+        border-color: #265B57;
+        }
+
+        .wrapper .poll-area label:hover {
+            background-color: #ddd; /* Light grey on hover */
+        }
+        
+        .wrapper .poll-area input[type="radio"] {
+            margin-right: 10px;
+        }
+
+        .wrapper .poll-area div {
+            width: 100%; /* Ensures div takes full width */
+        }
+
+        .wrapper .poll-area label .row {
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        }
+
+        .wrapper .poll-area label .row .column {
+        display: flex;
+        align-items: center;
+        }
+
+        .wrapper .poll-area label .row .column .circle {
+        position: relative;
+        height: 19px;
+        width: 19px;
+        border: 2px solid #ccc;
+        border-radius: 50%;
+        margin-right: 10px;
+        }
+
+        .wrapper .poll-area label .row .column .circle::after {
+        position: absolute;
+        content: "";
+        height: 11px;
+        width: 11px;
+        background: #265B57;
+        border-radius: 50%;
+        left: 2px;
+        top: 2px;
+        display: none;
+        }
+
+        .wrapper .poll-area label.active .row .column .circle::after {
+        display: block;
+        background: #265B57 !important;
+        }
+
+        .wrapper .poll-area label:hover .row .column .circle::after {
+        display: block;
+        background: #e6e6e6;
+        }
+
+        .wrapper .poll-area span {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .wrapper .poll-area .percentage-text {
+            white-space: nowrap; /* Keeps the percentage in one line */
+            font-weight: 500; /* Slightly bolder than normal text but not as bold as vote count */
+        }
+
+        .wrapper .poll-area .progress-bar {
+            position: absolute; /* Position absolutely within the container */
+            height: 100%; /* Full height of the container */
+            background-color: #71E0D7; /* Color of the progress bar */
+            border-radius: 5px; /* Match the container's border-radius */
+            width: 0%; /* Will be set dynamically based on the percentage */
+            transition: width 0.5s ease; /* Smooth transition for the bar */
+        }
+
+        .wrapper .poll-area .progress-bar-container {
+            height: 10px; /* Reduced height for a thinner progress bar */
+            width: 100%; /* Full width to represent 100% */
+            background-color: #eaeaea; /* Light gray background to represent the full bar */
+            border-radius: 5px;
+            margin-top: 5px; /* Adjusted space between stats and progress bar */
+            position: relative; /* Needed for absolute positioning of the progress bar */
+            flex-shrink:0;
+        }
+
+        .wrapper .poll-area input[type="radio"] {
+            margin-right: 10px; /* Space between radio and text */
+        }
+
+        .wrapper .poll-area label .percent {
+        display: none;
+        }
+
+        .wrapper .poll-area label .progress {
+        position: relative;
+        height: 7px;
+        width: 100%;
+        background: #f0f0f0;
+        margin: 8px 0 3px 0;
+        border-radius: 30px;
+        pointer-events: none;
+        display: none;
+        }
+
+        .wrapper .poll-area label.activeAll .percent,
+        .wrapper .poll-area label.activeAll .progress {
+        display: block;
+        }
+
+        .wrapper .poll-area label .progress::after {
+        position: absolute;
+        content: "";
+        height: 100%;
+        width: calc(1% * var(--w));
+        background: #ccc;
+        border-radius: 30px;
+        } 
+
+        .wrapper .poll-area .poll-label.winning-answer {
+            border: 2px solid #71E0D7;
+            padding: 8px 15px 15px 15px; /* Adjusted to match other labels */
+            border-radius: 5px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <header>Peer &#x1F440; </header>
+
+        <div id="new-poll-container" style="display:none;">
+            <h2>Create a New Poll</h2>
+            <div>Question</div>
+            <input type="text" id="poll-question" placeholder="Enter your poll question" />
+            <div>Answers</div>
+            <input type="text" id="poll-answer-1" placeholder="Option 1" />
+            <input type="text" id="poll-answer-2" placeholder="Option 2" />
+            <input type="text" id="poll-answer-3" placeholder="Option 3 (Optional)" />
+            <input type="text" id="poll-answer-4" placeholder="Option 4 (Optional)" />
+            <button id="create-poll-btn">Create Poll</button>
+        </div>
+
+        <div class="poll-area" id="poll-container">
+            <!-- Dynamic Poll content will be rendered here -->
+        </div>
+
+        <div id="vote-disclosure" style="display: none; color: gray; font-size: small; margin-top: 20px;">
+            Reminder: Votes are never associated with users. Vote with confidence!
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
