@@ -10,6 +10,12 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+
 app.use(express.static('public'));
 app.use(bodyParser.json()); // Use body-parser to parse JSON bodies
 
