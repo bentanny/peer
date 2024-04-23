@@ -17,29 +17,30 @@ app.use(bodyParser.json()); // Use body-parser to parse JSON bodies
 const allowAnyUser = false; // Set this to false to restrict to specific tokens
 
 app.use(async (req, res, next) => {
+  console.log("Middleware triggered");  // Debugging
+
   const { token } = req.query;
+  console.log("Received token:", token);  // Debugging
 
   if (!token) {
-    // No token provided, send an error message immediately
     return res.status(403).send("A token is required for authentication.");
   }
 
-  // Check if the token belongs to one of the allowed tokens
   const allowedTokens = ["58616959-59fe-41dc-9932-a3e24d37bd29", "295bb317-f74d-46f7-9ac4-3766ad383975"];
   if (!allowedTokens.includes(token)) {
     return res.status(401).send("Invalid token.");
   }
 
-  // Token is valid, find the user
   const user = await User.findOne({ where: { token } });
   if (!user) {
-    // Token does not match any user in the database
     return res.status(401).send("Invalid token.");
   }
 
-  req.user = user; // Attach the user to the request object
+  req.user = user;  // Debugging
+  console.log("Middleware passed");
   next();
 });
+
 
 
 // Initialize database and start the server
