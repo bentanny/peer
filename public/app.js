@@ -10,7 +10,32 @@ if (token) {
           document.getElementById('wait-message').style.display = 'block';
         }
       });
-  }
+}
+
+fetch(`/is-it-my-turn?token=${token}`)
+  .then(response => {
+    if (!response.ok) {
+      // If the response is not OK (like 403 or 401), handle accordingly
+      return response.text().then(text => {
+        throw new Error(text);
+      });
+    }
+
+    return response.json(); // Only parse JSON if the response is OK
+  })
+  .then(data => {
+    // Handle valid JSON response
+    if (data.isTurn) {
+      document.getElementById('question-form').style.display = 'block';
+    } else {
+      document.getElementById('wait-message').style.display = 'block';
+    }
+  })
+  .catch(error => {
+    // Handle errors and display an appropriate message
+    document.getElementById('poll-container').innerText = error.message;
+  });
+
 
 //Handling poll submission in frontend
 document.addEventListener('DOMContentLoaded', () => {
