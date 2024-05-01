@@ -65,24 +65,24 @@ sequelize.sync()
 });
 
 //Deploy!
-// const port = process.env.PORT || 3000;
-// server.listen(port, () => {
-//   console.log(`Server running on port ${port}`);
-// });
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
 
 //Test locally
-const port = process.env.PORT || 3000;
-sequelize.sync()
-  .then(() => {
-    server.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-      // Initialize narrator selection or any other start-up functions here
-      selectUserForQuestion();
-    });
-  })
-  .catch(error => {
-    console.error('Failed to sync database:', error);
-  });
+// const port = process.env.PORT || 3000;
+// sequelize.sync()
+//   .then(() => {
+//     server.listen(port, () => {
+//       console.log(`Server running on port ${port}`);
+//       // Initialize narrator selection or any other start-up functions here
+//       selectUserForQuestion();
+//     });
+//   })
+//   .catch(error => {
+//     console.error('Failed to sync database:', error);
+//   });
 
 //Validating turn
 app.get('/is-it-my-turn', async (req, res) => {
