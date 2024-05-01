@@ -97,7 +97,6 @@ app.get('/is-it-my-turn', async (req, res) => {
   res.json({ isTurn: user.isTurn });
 });
 
-
 //Choosing narrator:
 let switchTimer;
 function selectUserForQuestion() {
@@ -123,12 +122,11 @@ function updateUserTurn(selectedUser) {
   User.update({ isTurn: false }, { where: {} }).then(() => {
       selectedUser.update({ isTurn: true }).then(() => {
           clearTimeout(switchTimer);
-          switchTimer = setTimeout(selectUserForQuestion, 1800000);  // 30 minutes in milliseconds
+          switchTimer = setTimeout(selectUserForQuestion, 3600000);
           console.log(`Narrator switched to user ${selectedUser.name}.`);
       });
   });
 }
-
 
 function notifyUser(selectedUser) {
   const webhookURL = "https://hooks.slack.com/triggers/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";
@@ -147,13 +145,17 @@ function notifyUser(selectedUser) {
 // Function to check if all users have voted
 function checkAllVoted(pollId) {
   Vote.findAndCountAll({ where: { pollId: pollId } })
-    .then(result => {
-      if (result.count >= 16) { // Assuming there are exactly 16 users
-        selectUserForQuestion();
-      }
-    })
-    .catch(err => console.error("Error checking votes:", err));
+      .then(result => {
+          const requiredVotes = allowAnyUser ? 16 : 2;  // Use 16 or 2 depending on testing mode
+
+          if (result.count >= requiredVotes) {
+              clearTimeout(switchTimer);  // Cancel the current timer
+              selectUserForQuestion();  // Trigger a new selection
+          }
+      })
+      .catch(err => console.error("Error checking votes:", err));
 }
+
 
 
 //handling poll creation in backend
@@ -282,6 +284,7 @@ io.on('connection', (socket) => {
               count: 1
           });
         }
+        checkAllVoted(pollId);
       }   
       // Retrieve the number of votes for each answer
       const answers = JSON.parse(poll.answers);
