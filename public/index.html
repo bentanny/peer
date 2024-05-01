@@ -301,6 +301,15 @@
             border-radius: 5px;
         }
 
+        .centered-error {
+            color: red;
+            font-weight: bold;
+            padding: 10px;
+            text-align:center;
+            margin-top: 10px;
+        }
+
+
     </style>
 </head>
 <body>
@@ -318,6 +327,9 @@
             <input type="text" id="poll-answer-4" placeholder="Option 4 (Optional)" />
             <button id="create-poll-btn">Create Poll</button>
         </div>
+
+        <div id="error-message" style="display: none; color: red;"></div>
+
 
         <div class="poll-area" id="poll-container">
             <!-- Dynamic Poll content will be rendered here -->
