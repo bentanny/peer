@@ -28,7 +28,7 @@ app.use(async (req, res, next) => {
 
   if (!allowAnyUser) {
     console.log('app.use working')
-    const allowedTokens = ["58616959-59fe-41dc-9932-a3e24d37bd29", "a1234567-89ab-cdef-1234-56789abcdef0"];
+    const allowedTokens = ["58616959-59fe-41dc-9932-a3e24d37bd29", "295bb317-f74d-46f7-9ac4-3766ad383975"];
     if (!allowedTokens.includes(token)) {
         return res.status(401).send("Invalid token.");
     }
