@@ -141,8 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    function displayPoll(pollData, hasVoted, isValidToken) {    
-        console.log("poll data received")
+    function displayPoll(pollData, hasVoted) {    
         const pollContainer = document.getElementById('poll-container');
         pollContainer.innerHTML = `<h3>${pollData.question}</h3>`;
     
@@ -180,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pollContainer.innerHTML += `<div class="poll-item">${answerHTML}</div>`;
         });
     
-        if (!hasVoted && isValidToken) {
+        if (!hasVoted) {
             const voteButton = document.createElement('button');
             voteButton.textContent = 'Vote';
             voteButton.onclick = function() {
