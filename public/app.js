@@ -1,41 +1,29 @@
 const token = new URLSearchParams(window.location.search).get('token');
+document.getElementById('poll-container').style.display = 'none';  // Start hidden
+document.getElementById('vote-disclosure').style.display = 'none';
 
 if (token) {
     fetch(`/is-it-my-turn?token=${token}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.isTurn) {
-          document.getElementById('question-form').style.display = 'block';
-        } else {
-          document.getElementById('wait-message').style.display = 'block';
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(text);
+            });
         }
-      });
+        return response.json();
+    })
+    .then(data => {
+        if (data.isTurn) {
+            document.getElementById('new-poll-container').style.display = 'block';
+        } else {
+            document.getElementById('wait-message').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        document.getElementById('poll-container').style.display = 'none';
+    });
+
 }
-
-fetch(`/is-it-my-turn?token=${token}`)
-  .then(response => {
-    if (!response.ok) {
-      // If the response is not OK (like 403 or 401), handle accordingly
-      return response.text().then(text => {
-        throw new Error(text);
-      });
-    }
-
-    return response.json(); // Only parse JSON if the response is OK
-  })
-  .then(data => {
-    // Handle valid JSON response
-    if (data.isTurn) {
-      document.getElementById('question-form').style.display = 'block';
-    } else {
-      document.getElementById('wait-message').style.display = 'block';
-    }
-  })
-  .catch(error => {
-    // Handle errors and display an appropriate message
-    document.getElementById('poll-container').innerText = error.message;
-  });
-
 
 //Handling poll submission in frontend
 document.addEventListener('DOMContentLoaded', () => {
@@ -43,9 +31,59 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
 
+
+
+    if (!token) {
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.innerText = 'A token is required for authentication.';
+        errorMessage.classList.add('centered-error');
+        errorMessage.style.display = 'block';
+
+        return;  // Stop further execution
+    }
+
+
     // Connect to socket with token as query parameter
     const socket = io({ query: `token=${token}` });
 
+    socket.on('poll_created', pollData => {
+    fetch(`/validate-token?token=${token}`)
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(text);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            const isValidToken = data.valid;
+            document.getElementById('poll-container').style.display = 'block';
+
+            socket.emit('check_voted', { pollId: pollData.id }, (hasVoted) => {
+                displayPoll(pollData, hasVoted, isValidToken);
+            });
+        })
+        .catch(error => {
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.innerText = error.message;
+            errorMessage.classList.add('centered-error');
+            errorMessage.style.display = 'block';
+
+            document.getElementById('poll-container').style.display = 'none';
+            document.getElementById('vote-disclosure').style.display = 'none';
+            return;
+        });
+    });
+
+    //Update poll whenever vote is received
+    socket.on('update_poll', pollData => {
+        if (pollData.id) {
+            socket.emit('check_voted', { pollId: pollData.id }, (hasVoted) => {
+                displayPoll(pollData, hasVoted);
+            });
+        }
+    });
 
     // Listen for server's instruction to show/hide the new poll container
     socket.on('update_turn_status', ({ isTurn }) => {
@@ -77,22 +115,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Receive and display a new poll from the server
-    socket.on('poll_created', pollData => {
-        if (pollData.id) { // Changed from pollData.pollId to pollData.id
-            socket.emit('check_voted', { pollId: pollData.id }, (hasVoted) => {
-                displayPoll(pollData, hasVoted);
-            });
-        }
-    });
+    // socket.on('poll_created', pollData => {
+    //     if (pollData.id) {
+    //         socket.emit('check_voted', { pollId: pollData.id }, (hasVoted) => {
+    //             displayPoll(pollData, hasVoted);
+    //         });
+    //     }
+    // });
 
-    //Update poll whenever vote is received
-    socket.on('update_poll', pollData => {
-        if (pollData.id) {
-            socket.emit('check_voted', { pollId: pollData.id }, (hasVoted) => {
-                displayPoll(pollData, hasVoted);
-            });
-        }
-    });
+   
 
     //Submitting vote using submit_vote
     function submitVote(pollData, answerIndex) {
@@ -110,7 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    function displayPoll(pollData, hasVoted) {    
+    function displayPoll(pollData, hasVoted, isValidToken) {    
+        console.log("poll data received")
         const pollContainer = document.getElementById('poll-container');
         pollContainer.innerHTML = `<h3>${pollData.question}</h3>`;
     
@@ -148,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
             pollContainer.innerHTML += `<div class="poll-item">${answerHTML}</div>`;
         });
     
-        if (!hasVoted) {
+        if (!hasVoted && isValidToken) {
             const voteButton = document.createElement('button');
             voteButton.textContent = 'Vote';
             voteButton.onclick = function() {
@@ -174,3 +206,4 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
 })
+
