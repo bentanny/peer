@@ -28,7 +28,7 @@ app.use(async (req, res, next) => {
 
   if (!allowAnyUser) {
     console.log('app.use working')
-    const allowedTokens = ["58616959-59fe-41dc-9932-a3e24d37bd29", "295bb317-f74d-46f7-9ac4-3766ad383975"];
+    const allowedTokens = ["58616959-59fe-41dc-9932-a3e24d37bd29", "4b4f06ce-a150-47d5-b21f-61de48673f0c"];
     if (!allowedTokens.includes(token)) {
         return res.status(401).send("Invalid token.");
     }
@@ -103,7 +103,7 @@ function selectUserForQuestion() {
   const query = allowAnyUser ? {} : {
       where: {
           token: {
-              [Op.in]: ["58616959-59fe-41dc-9932-a3e24d37bd29", "295bb317-f74d-46f7-9ac4-3766ad383975"]
+              [Op.in]: ["58616959-59fe-41dc-9932-a3e24d37bd29", "4b4f06ce-a150-47d5-b21f-61de48673f0c"]
           }
       }
   };
@@ -122,7 +122,7 @@ function updateUserTurn(selectedUser) {
   User.update({ isTurn: false }, { where: {} }).then(() => {
       selectedUser.update({ isTurn: true }).then(() => {
           clearTimeout(switchTimer);
-          switchTimer = setTimeout(selectUserForQuestion, 3600000);
+          switchTimer = setTimeout(selectUserForQuestion, 120000); //switching every 2 min
           console.log(`Narrator switched to user ${selectedUser.name}.`);
       });
   });
